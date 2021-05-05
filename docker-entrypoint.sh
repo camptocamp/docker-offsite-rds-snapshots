@@ -54,7 +54,7 @@ src_snapshot_name="${SRC_RDS_DATABASE}-snapshot-$(date +%Y-%m-%d-%H-%M-%S)"
 echo "$(date +%Y-%m-%d-%H:%M:%S) : Launch snapshot for ${SRC_RDS_DATABASE}"
 aws --profile source rds create-db-snapshot \
     --db-instance-identifier ${SRC_RDS_DATABASE} --db-snapshot-identifier ${src_snapshot_name} \
-    --tag Key=Creator,Value=batch-rds-offsite > src.json
+    --tag Key=Creator,Value=${AWS_BATCH_JQ_NAME} > src.json
 [ !  $? -eq 0 ] && { exit $?; }
 
 src_snapshot_arn=$(jq -r '.DBSnapshot.DBSnapshotArn' src.json)
