@@ -59,7 +59,7 @@ aws --profile source rds create-db-snapshot \
 
 src_snapshot_arn=$(jq -r '.DBSnapshot.DBSnapshotArn' src.json)
 
-for i in $(seq 1 4) ; do
+for i in $(seq 1 6) ; do
    aws --profile source rds wait db-snapshot-available \
        --db-instance-identifier ${SRC_RDS_DATABASE} --db-snapshot-identifier ${src_snapshot_name}
    if [ $? -eq 0 ]; then
@@ -67,6 +67,10 @@ for i in $(seq 1 4) ; do
    fi
      echo "Retrying.."
 done
+
+aws --profile source rds wait db-snapshot-available \
+    --db-instance-identifier ${SRC_RDS_DATABASE} --db-snapshot-identifier ${src_snapshot_name}
+[ !  $? -eq 0 ] && { echo "$(date +%Y-%m-%d-%H:%M:%S) : SRC snapshot is not available ; exit $?; }
 
 echo "$(date +%Y-%m-%d-%H:%M:%S) : SRC snapshot is available (${src_snapshot_arn})"
 
