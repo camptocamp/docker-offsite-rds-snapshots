@@ -55,7 +55,7 @@ echo "$(date +%Y-%m-%d-%H:%M:%S) : Launch snapshot for ${SRC_RDS_DATABASE}"
 aws --profile source rds create-db-snapshot \
     --db-instance-identifier ${SRC_RDS_DATABASE} --db-snapshot-identifier ${src_snapshot_name} \
     --tag Key=Creator,Value=${AWS_BATCH_JQ_NAME} > src.json
-[ !  $? -eq 0 ] && { exit $?; }
+[ !  $? -eq 0 ] && { exit 1; }
 
 src_snapshot_arn=$(jq -r '.DBSnapshot.DBSnapshotArn' src.json)
 
@@ -70,7 +70,7 @@ done
 
 aws --profile source rds wait db-snapshot-available \
     --db-instance-identifier ${SRC_RDS_DATABASE} --db-snapshot-identifier ${src_snapshot_name}
-[ !  $? -eq 0 ] && { echo "$(date +%Y-%m-%d-%H:%M:%S) : SRC snapshot is not available" ; exit $?; }
+[ !  $? -eq 0 ] && { echo "$(date +%Y-%m-%d-%H:%M:%S) : SRC snapshot is not available" ; exit 1; }
 
 echo "$(date +%Y-%m-%d-%H:%M:%S) : SRC snapshot is available (${src_snapshot_arn})"
 
