@@ -46,7 +46,7 @@ aws configure set region ${SRC_RDS_DATABASE_REGION} --profile source
 aws configure set credential_source ${CREDENTIAL_SRC} --profile source
 
 if ! aws --profile source rds describe-db-instances --db-instance-identifier ${SRC_RDS_DATABASE} > /dev/null ; then
-  exit $?
+  exit 1
 fi
 
 # SRC - make snapshot and wait
