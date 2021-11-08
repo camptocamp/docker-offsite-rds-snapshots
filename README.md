@@ -3,26 +3,37 @@
 This is a docker image to make an RDS DB snapshot and then make a Cross Region and/or a Cross Account replica.
 
 
+## Usage :
+
+Use the following envars and then add those below to activate crr and/or car :
+
+
+| Name          | Description |
+| ------------- |-------------|
+| SRC_RDS_DATABASE | **Required** : Name of the database or cluster to snapshot (ex "my-db-1") |
+| SRC_RDS_DATABASE_REGION | **Required** : AWS region of the database or cluster to snapshot (ex "eu-west-1") |
+| CREDENTIAL_SRC | **Optional** : Where the aws CLI get its credentials, see [aws-credential_source](https://docs.aws.amazon.com/sdkref/latest/guide/setting-global-credential_source.html) (default: "EcsContainer") |
+| DEBUG | **Optional** : If set to true print all operations on stdout (default: none) |
+| RDS_ENGINE | **Optional** : If set to "aurora" perform cluster snaphot instead of database (default: none) |
+| KMS_KEY_ARN  | **Optional** : If not empty use the ARN key to copy encrypted snapshot (default: none) |
+
+
 ## Cross region replication (CRR) :
 
-This will copy the snapshot to an other region, launch the container with following envars :
+This will copy the snapshot to an other region of the same account, launch the container with following envars :
 
- * SRC_RDS_DATABASE          : ex "production"
- * SRC_RDS_DATABASE_REGION   : ex "eu-west-1"
- * CRR_REGION                : ex "eu-central-1"
+* CRR_REGION : ex "eu-central-1"
 
 
 ## Cross account region replication (CAR) :
 
-This will share th snapshot to an other AWS account and restore it in the chosen region, launch the container with following envars :
+This will share the snapshot to an other AWS account and copy it to the chosen region, launch the container with following envars :
 
- * SRC_RDS_DATABASE            : ex "production"
- * SRC_RDS_DATABASE_REGION     : ex "eu-west-1"
- * CAR_ACCOUNT_ID	             : ex "012345678910" (destination account id)
- * CAR_REGION	                 : ex "eu-west-3"
- * CAR_ROLE_ARN	               : ex "arn:aws:iam::012345678910:role/allow-copy-snapshot"
+ * CAR_ACCOUNT_ID	: ex "012345678910" (destination account id)
+ * CAR_REGION	: ex "eu-west-3"
+ * CAR_ROLE_ARN	: ex "arn:aws:iam::012345678910:role/allow-copy-snapshot"
 
-The role must exist in the destination account, with the source account as a trusted entity and the following permissions :
+The IAM role must exist in the destination account, with the source account as a trusted entity and the following permissions :
 
 ```
       {
@@ -34,10 +45,19 @@ The role must exist in the destination account, with the source account as a tru
             "Effect": "Allow",
             "Resource": "*",
             "Sid": "AllowSnapshotsCopy"
-        }
+        },
+        {
+            "Action": [
+                "rds:CopyDBClusterSnapshot",
+                "rds:AddTagsToResource",
+                "rds:DescribeDBClusterSnapshots",
+                "rds:DeleteDBClusterSnapshot"
+            ],
+            "Effect": "Allow",
+            "Resource": "*",
+            "Sid": "AllowAuroraSnapshotsCopy"
+        },        
 ```
 
-## Other envars :
+If KMS_KEY_ARN is set the role will also need KMS permissions, see [Sharing encrypted snapshots](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_ShareSnapshot.html#USER_ShareSnapshot.Encrypted)
 
-* CREDENTIAL_SRC : Where the aws cli get its credentials, see [aws-setting-credential_source](https://docs.aws.amazon.com/sdkref/latest/guide/setting-global-credential_source.html) (default: "EcsContainer")
-* DEBUG: If set to true print all operations on stdout
