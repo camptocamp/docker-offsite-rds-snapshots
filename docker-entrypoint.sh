@@ -101,9 +101,9 @@ else
 fi
 echo "$(date +%Y-%m-%d-%H:%M:%S) : SRC snapshot is available (${src_snapshot_arn})"
 
-# CRR - cross region replication - copy snaphost and wait
+# CRR - cross region replication - copy snapshot and wait
 if [ ! -z "${CRR_REGION}" ] ; then
-  echo "$(date +%Y-%m-%d-%H:%M:%S) : CRR : copy snaphost to region ${CRR_REGION}"
+  echo "$(date +%Y-%m-%d-%H:%M:%S) : CRR : copy snapshot to region ${CRR_REGION}"
 
   if [ "${RDS_ENGINE}" == "aurora" ]; then
     aws --profile source --region ${CRR_REGION} rds copy-db-cluster-snapshot --copy-tags \
@@ -126,9 +126,9 @@ if [ ! -z "${CRR_REGION}" ] ; then
   echo "$(date +%Y-%m-%d-%H:%M:%S) : CRR : snapshot is available (${crr_snapshot_arn})"
 fi
 
-# CAR - cross account replication - share and copy snaphost and wait
+# CAR - cross account replication - share and copy snapshot and wait
 if [ ! -z "${CAR_REGION}" ] ; then
-  echo "$(date +%Y-%m-%d-%H:%M:%S) : CAR : copy snaphost to account ${CAR_ACCOUNT_ID} and to region ${CAR_REGION}"
+  echo "$(date +%Y-%m-%d-%H:%M:%S) : CAR : copy snapshot to account ${CAR_ACCOUNT_ID} and to region ${CAR_REGION}"
 
   if [ "${RDS_ENGINE}" == "aurora" ]; then
     aws --profile source --region ${SRC_RDS_DATABASE_REGION} rds modify-db-cluster-snapshot-attribute \
