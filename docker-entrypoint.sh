@@ -170,7 +170,9 @@ if [ ! -z "${CAR_REGION}" ] ; then
         [ !  $? -eq 0 ] && { exit 1; }
 
         cartmp_snapshot_arn=$(jq -r '.DBClusterSnapshot.DBClusterSnapshotArn' cartmp_copy.json)
-        aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds wait db-cluster-snapshot-available --db-cluster-snapshot-identifier ${cartmp_snapshot_arn}
+        for i in $(seq 1 2) ; do
+          aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds wait db-cluster-snapshot-available --db-cluster-snapshot-identifier ${cartmp_snapshot_arn}
+        done
 
         echo "$(date +%Y-%m-%d-%H:%M:%S) : CAR : copy the temp snapshot to region ${CAR_REGION}"
         aws --profile offsite --region ${CAR_REGION} rds copy-db-cluster-snapshot --source-region ${SRC_RDS_DATABASE_REGION}  \
@@ -185,7 +187,9 @@ if [ ! -z "${CAR_REGION}" ] ; then
         [ !  $? -eq 0 ] && { exit 1; }
 
         cartmp_snapshot_arn=$(jq -r '.DBClusterSnapshot.DBClusterSnapshotArn' cartmp_copy.json)
-        aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds wait db-cluster-snapshot-available --db-cluster-snapshot-identifier ${cartmp_snapshot_arn}
+        for i in $(seq 1 2) ; do
+          aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds wait db-cluster-snapshot-available --db-cluster-snapshot-identifier ${cartmp_snapshot_arn}
+        done
 
         echo "$(date +%Y-%m-%d-%H:%M:%S) : CAR : copy the temp snapshot to region ${CAR_REGION}"
         aws --profile offsite --region ${CAR_REGION} rds copy-db-cluster-snapshot --source-region ${SRC_RDS_DATABASE_REGION}  \
