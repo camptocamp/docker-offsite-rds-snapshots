@@ -44,6 +44,7 @@ if [ -z "${CREDENTIAL_SRC}" ]; then
 fi
 
 aws configure set credential_source ${CREDENTIAL_SRC} --profile source
+aws --profile source sts get-caller-identity --no-cli-pager
 
 if [ "${RDS_ENGINE}" == "aurora" ]; then
   if ! aws --profile source --region ${SRC_RDS_DATABASE_REGION} \
@@ -142,15 +143,16 @@ if [ ! -z "${CAR_REGION}" ] ; then
 
   aws configure set role_arn ${CAR_ROLE_ARN} --profile offsite
   aws configure set credential_source ${CREDENTIAL_SRC} --profile offsite
+  aws --profile offsite sts get-caller-identity --no-cli-pager
 
   if [ "${RDS_ENGINE}" == "aurora" ]; then
 
     if [ "${CAR_REGION}" == "${SRC_RDS_DATABASE_REGION}" ]; then
       echo "$(date +%Y-%m-%d-%H:%M:%S) : CAR : copy snapshot to account ${CAR_ACCOUNT_ID} / region ${CAR_REGION}"
 
-      if [ ! -z "${KMS_KEY_ARN}" ] ; then
+      if [ ! -z "${SRC_KMS_KEY_ARN}" ] ; then
         aws --profile offsite --region ${CAR_REGION} rds copy-db-cluster-snapshot --source-region ${SRC_RDS_DATABASE_REGION}  \
-            --kms-key-id ${KMS_KEY_ARN} --source-db-cluster-snapshot-identifier ${src_snapshot_arn}  \
+            --kms-key-id ${SRC_KMS_KEY_ARN} --source-db-cluster-snapshot-identifier ${src_snapshot_arn}  \
             --target-db-cluster-snapshot-identifier "${src_snapshot_name}-replica-offsite" > car_copy.json
         [ !  $? -eq 0 ] && { exit 1; }
       else
@@ -163,9 +165,9 @@ if [ ! -z "${CAR_REGION}" ] ; then
       aws --profile offsite --region ${CAR_REGION} rds wait db-cluster-snapshot-available --db-cluster-snapshot-identifier ${car_snapshot_arn}
     else
       echo "$(date +%Y-%m-%d-%H:%M:%S) : CAR : copy a temp snapshot to account ${CAR_ACCOUNT_ID} / region ${SRC_RDS_DATABASE_REGION}"
-      if [ ! -z "${KMS_KEY_ARN}" ] ; then
+      if [ ! -z "${SRC_KMS_KEY_ARN}" ] ; then
         aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds copy-db-cluster-snapshot --source-region ${SRC_RDS_DATABASE_REGION}  \
-            --kms-key-id ${KMS_KEY_ARN}  --source-db-cluster-snapshot-identifier ${src_snapshot_arn} \
+            --kms-key-id ${SRC_KMS_KEY_ARN}  --source-db-cluster-snapshot-identifier ${src_snapshot_arn} \
             --target-db-cluster-snapshot-identifier "${src_snapshot_name}-replica-offsite" > cartmp_copy.json
         [ !  $? -eq 0 ] && { exit 1; }
 
@@ -203,16 +205,69 @@ if [ ! -z "${CAR_REGION}" ] ; then
     aws --profile offsite --region ${CAR_REGION} rds wait db-cluster-snapshot-available --db-cluster-snapshot-identifier ${car_snapshot_arn}
     [ !  $? -eq 0 ] && { exit 1; }
   else
-    aws --profile offsite --region ${CAR_REGION} rds copy-db-snapshot --source-region ${SRC_RDS_DATABASE_REGION} \
-        --source-db-snapshot-identifier ${src_snapshot_arn} --target-db-snapshot-identifier "${src_snapshot_name}-replica-offsite" > car_copy.json
-    [ !  $? -eq 0 ] && { exit 1; }
+    if [ "${CAR_REGION}" == "${SRC_RDS_DATABASE_REGION}" ]; then
+      echo "$(date +%Y-%m-%d-%H:%M:%S) : CAR : copy snapshot to account ${CAR_ACCOUNT_ID} / region ${CAR_REGION}"
 
-    car_snapshot_arn=$(jq -r '.DBSnapshot.DBSnapshotArn' car_copy.json)
-    aws --profile offsite --region ${CAR_REGION} rds wait db-snapshot-available --db-snapshot-identifier ${car_snapshot_arn}
-    [ !  $? -eq 0 ] && { exit 1; }
-fi
+      if [ ! -z "${SRC_KMS_KEY_ARN}" ] ; then
+        aws --profile offsite --region ${CAR_REGION} rds copy-db-snapshot --source-region ${SRC_RDS_DATABASE_REGION} \
+            --source-db-snapshot-identifier ${src_snapshot_arn} --target-db-snapshot-identifier "${src_snapshot_name}-replica-offsite" \
+            --kms-key-id ${SRC_KMS_KEY_ARN} > car_copy.json
+        [ !  $? -eq 0 ] && { exit 1; }
+      else
+        aws --profile offsite --region ${CAR_REGION} rds copy-db-snapshot --source-region ${SRC_RDS_DATABASE_REGION} \
+            --source-db-snapshot-identifier ${src_snapshot_arn} --target-db-snapshot-identifier "${src_snapshot_name}-replica-offsite" > car_copy.json
+        [ !  $? -eq 0 ] && { exit 1; }
+      fi
+      .DBSnapshot.DBSnapshotArn
+      car_snapshot_arn=$(jq -r '.DBSnapshot.DBSnapshotArn' car_copy.json)
+      aws --profile offsite --region ${CAR_REGION} rds wait db-snapshot-available --db-snapshot-identifier ${car_snapshot_arn}
+    else
+      echo "$(date +%Y-%m-%d-%H:%M:%S) : CAR : copy a temp snapshot to account ${CAR_ACCOUNT_ID} / region ${SRC_RDS_DATABASE_REGION}"
+      if [ ! -z "${SRC_KMS_KEY_ARN}" ] ; then
+        aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds copy-db-snapshot --source-region ${SRC_RDS_DATABASE_REGION}  \
+            --kms-key-id ${SRC_KMS_KEY_ARN}  --source-db-snapshot-identifier ${src_snapshot_arn} \
+            --target-db-snapshot-identifier "${src_snapshot_name}-replica-offsite" > cartmp_copy.json
+        [ !  $? -eq 0 ] && { exit 1; }
 
+        cartmp_snapshot_arn=$(jq -r '.DBSnapshot.DBSnapshotArn' cartmp_copy.json)
+        for i in $(seq 1 2) ; do
+          aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds wait db-snapshot-available --db-snapshot-identifier ${cartmp_snapshot_arn}
+        done
+
+        echo "$(date +%Y-%m-%d-%H:%M:%S) : CAR : copy the temp snapshot to region ${CAR_REGION}"
+        if [ ! -z "${DST_KMS_KEY_ARN}" ] ; then
+          aws --profile offsite --region ${CAR_REGION} rds copy-db-snapshot --source-region ${SRC_RDS_DATABASE_REGION}  \
+              --kms-key-id ${DST_KMS_KEY_ARN} --source-db-snapshot-identifier ${cartmp_snapshot_arn} \
+              --target-db-snapshot-identifier "${src_snapshot_name}-replica-offsite" > car_copy.json
+          [ !  $? -eq 0 ] && { exit 1; }
+        else 
+          aws --profile offsite --region ${CAR_REGION} rds copy-db-snapshot --source-region ${SRC_RDS_DATABASE_REGION}  \
+              --kms-key-id alias/aws/rds --source-db-snapshot-identifier ${cartmp_snapshot_arn} \
+              --target-db-snapshot-identifier "${src_snapshot_name}-replica-offsite" > car_copy.json
+          [ !  $? -eq 0 ] && { exit 1; }
+        car_snapshot_arn=$(jq -r '.DBSnapshot.DBSnapshotArn' car_copy.json)
+        aws --profile offsite --region ${CAR_REGION} rds wait db-snapshot-available --db-snapshot-identifier ${car_snapshot_arn}
+        fi
+      else
+        aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds copy-db-snapshot --source-region ${SRC_RDS_DATABASE_REGION}  \
+            --source-db-snapshot-identifier ${src_snapshot_arn} --target-db-snapshot-identifier "${src_snapshot_name}-replica-offsite" > cartmp_copy.json
+        [ !  $? -eq 0 ] && { exit 1; }
+
+        cartmp_snapshot_arn=$(jq -r '.DBSnapshot.DBSnapshotArn' cartmp_copy.json)
+        for i in $(seq 1 2) ; do
+          aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds wait db-snapshot-available --db-snapshot-identifier ${cartmp_snapshot_arn}
+        done
+
+        echo "$(date +%Y-%m-%d-%H:%M:%S) : CAR : copy the temp snapshot to region ${CAR_REGION}"
+        aws --profile offsite --region ${CAR_REGION} rds copy-db-snapshot --source-region ${SRC_RDS_DATABASE_REGION}  \
+            --source-db-snapshot-identifier ${cartmp_snapshot_arn} --target-db-snapshot-identifier "${src_snapshot_name}-replica-offsite" > car_copy.json
+        [ !  $? -eq 0 ] && { exit 1; }
+        car_snapshot_arn=$(jq -r '.DBSnapshot.DBSnapshotArn' car_copy.json)
+        aws --profile offsite --region ${CAR_REGION} rds wait db-snapshot-available --db-snapshot-identifier ${car_snapshot_arn}
+      fi
+    fi
   echo "$(date +%Y-%m-%d-%H:%M:%S) : CAR : snapshot is available (${car_snapshot_arn})"
+  fi
 fi
 
 # CLEAN - remove source temporary snapshot
