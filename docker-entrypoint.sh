@@ -280,6 +280,9 @@ if [ "${RDS_ENGINE}" == "aurora" ]; then
       --db-cluster-snapshot-identifier ${src_snapshot_name} > /dev/null
   exit $?
 else
+  aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds delete-db-snapshot \
+      --db-snapshot-identifier "${src_snapshot_name}-replica-offsite" > /dev/null
+  [ !  $? -eq 0 ] && { exit 1; }
   aws --profile source --region ${SRC_RDS_DATABASE_REGION} rds delete-db-snapshot \
       --db-snapshot-identifier ${src_snapshot_name} > /dev/null
   exit $?
