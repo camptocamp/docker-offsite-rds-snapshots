@@ -160,7 +160,6 @@ if [ ! -z "${CAR_REGION}" ] ; then
             --source-db-cluster-snapshot-identifier ${src_snapshot_arn} --target-db-cluster-snapshot-identifier "${src_snapshot_name}-replica-offsite" > car_copy.json
         [ !  $? -eq 0 ] && { exit 1; }
       fi
-      .DBClusterSnapshot.DBClusterSnapshotArn
       car_snapshot_arn=$(jq -r '.DBClusterSnapshot.DBClusterSnapshotArn' car_copy.json)
       aws --profile offsite --region ${CAR_REGION} rds wait db-cluster-snapshot-available --db-cluster-snapshot-identifier ${car_snapshot_arn}
     else
@@ -218,7 +217,6 @@ if [ ! -z "${CAR_REGION}" ] ; then
             --source-db-snapshot-identifier ${src_snapshot_arn} --target-db-snapshot-identifier "${src_snapshot_name}-replica-offsite" > car_copy.json
         [ !  $? -eq 0 ] && { exit 1; }
       fi
-      .DBSnapshot.DBSnapshotArn
       car_snapshot_arn=$(jq -r '.DBSnapshot.DBSnapshotArn' car_copy.json)
       aws --profile offsite --region ${CAR_REGION} rds wait db-snapshot-available --db-snapshot-identifier ${car_snapshot_arn}
     else
@@ -245,9 +243,9 @@ if [ ! -z "${CAR_REGION}" ] ; then
               --kms-key-id alias/aws/rds --source-db-snapshot-identifier ${cartmp_snapshot_arn} \
               --target-db-snapshot-identifier "${src_snapshot_name}-replica-offsite" > car_copy.json
           [ !  $? -eq 0 ] && { exit 1; }
+        fi
         car_snapshot_arn=$(jq -r '.DBSnapshot.DBSnapshotArn' car_copy.json)
         aws --profile offsite --region ${CAR_REGION} rds wait db-snapshot-available --db-snapshot-identifier ${car_snapshot_arn}
-        fi
       else
         aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds copy-db-snapshot --source-region ${SRC_RDS_DATABASE_REGION}  \
             --source-db-snapshot-identifier ${src_snapshot_arn} --target-db-snapshot-identifier "${src_snapshot_name}-replica-offsite" > cartmp_copy.json
