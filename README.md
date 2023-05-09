@@ -14,8 +14,10 @@ Use the following envars and then add those below to activate crr and/or car :
 | SRC_RDS_DATABASE_REGION | **Required** : AWS region of the database or cluster to snapshot (ex "eu-west-1") |
 | CREDENTIAL_SRC | **Optional** : Where the aws CLI get its credentials, see [aws-credential_source](https://docs.aws.amazon.com/sdkref/latest/guide/setting-global-credential_source.html) (default: "EcsContainer") |
 | DEBUG | **Optional** : If set to true print all operations on stdout (default: none) |
-| RDS_ENGINE | **Optional** : If set to "aurora" perform cluster snaphot instead of database (default: none) |
 | KMS_KEY_ARN  | **Optional** : If not empty use the ARN key to copy encrypted snapshot (default: none) |
+| RDS_ENGINE | **Optional** : If set to "aurora" perform cluster snaphot instead of database (default: none) |
+| SNAPSHOTS_WAIT_PERIODS | **Optional** : Number of period to wait for the snaphots to be available, each period is 30 minutes (default: 6) |
+
 
 
 ## Cross region replication (CRR) :
@@ -56,8 +58,7 @@ The IAM role must exist in the destination account, with the source account as a
             "Effect": "Allow",
             "Resource": "*",
             "Sid": "AllowAuroraSnapshotsCopy"
-        },        
+        },
 ```
 
 If KMS_KEY_ARN is set the role will also need KMS permissions, see [Sharing encrypted snapshots](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_ShareSnapshot.html#USER_ShareSnapshot.Encrypted)
-
