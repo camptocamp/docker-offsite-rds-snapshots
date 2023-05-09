@@ -43,6 +43,9 @@ if [ -z "${CREDENTIAL_SRC}" ]; then
   CREDENTIAL_SRC="EcsContainer"
 fi
 
+SNAPSHOTS_WAIT_PERIODS=${SNAPSHOTS_WAIT_PERIODS:=2}
+echo "$(date +%Y-%m-%d-%H:%M:%S) : Wait snapshots for ${SNAPSHOTS_WAIT_PERIODS} periods"
+
 aws configure set credential_source ${CREDENTIAL_SRC} --profile source
 aws --profile source sts get-caller-identity --no-cli-pager
 
@@ -75,7 +78,7 @@ else
   src_snapshot_arn=$(jq -r '.DBSnapshot.DBSnapshotArn' src.json)
 fi
 
-for i in $(seq 1 6) ; do
+for i in $(seq 1 ${SNAPSHOTS_WAIT_PERIODS}) ; do
 
   if [ "${RDS_ENGINE}" == "aurora" ]; then
     aws --profile source --region ${SRC_RDS_DATABASE_REGION} rds wait db-cluster-snapshot-available \
@@ -171,7 +174,7 @@ if [ ! -z "${CAR_REGION}" ] ; then
         [ !  $? -eq 0 ] && { exit 1; }
 
         cartmp_snapshot_arn=$(jq -r '.DBClusterSnapshot.DBClusterSnapshotArn' cartmp_copy.json)
-        for i in $(seq 1 2) ; do
+        for i in $(seq 1 ${SNAPSHOTS_WAIT_PERIODS}) ; do
           aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds wait db-cluster-snapshot-available --db-cluster-snapshot-identifier ${cartmp_snapshot_arn}
         done
 
@@ -188,7 +191,7 @@ if [ ! -z "${CAR_REGION}" ] ; then
         [ !  $? -eq 0 ] && { exit 1; }
 
         cartmp_snapshot_arn=$(jq -r '.DBClusterSnapshot.DBClusterSnapshotArn' cartmp_copy.json)
-        for i in $(seq 1 2) ; do
+        for i in $(seq 1 ${SNAPSHOTS_WAIT_PERIODS}) ; do
           aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds wait db-cluster-snapshot-available --db-cluster-snapshot-identifier ${cartmp_snapshot_arn}
         done
 
@@ -228,7 +231,7 @@ if [ ! -z "${CAR_REGION}" ] ; then
         [ !  $? -eq 0 ] && { exit 1; }
 
         cartmp_snapshot_arn=$(jq -r '.DBSnapshot.DBSnapshotArn' cartmp_copy.json)
-        for i in $(seq 1 2) ; do
+        for i in $(seq 1 ${SNAPSHOTS_WAIT_PERIODS}) ; do
           aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds wait db-snapshot-available --db-snapshot-identifier ${cartmp_snapshot_arn}
         done
 
@@ -238,7 +241,7 @@ if [ ! -z "${CAR_REGION}" ] ; then
               --kms-key-id ${DST_KMS_KEY_ARN} --source-db-snapshot-identifier ${cartmp_snapshot_arn} \
               --target-db-snapshot-identifier "${src_snapshot_name}-replica-offsite" > car_copy.json
           [ !  $? -eq 0 ] && { exit 1; }
-        else 
+        else
           aws --profile offsite --region ${CAR_REGION} rds copy-db-snapshot --source-region ${SRC_RDS_DATABASE_REGION}  \
               --kms-key-id alias/aws/rds --source-db-snapshot-identifier ${cartmp_snapshot_arn} \
               --target-db-snapshot-identifier "${src_snapshot_name}-replica-offsite" > car_copy.json
@@ -252,7 +255,7 @@ if [ ! -z "${CAR_REGION}" ] ; then
         [ !  $? -eq 0 ] && { exit 1; }
 
         cartmp_snapshot_arn=$(jq -r '.DBSnapshot.DBSnapshotArn' cartmp_copy.json)
-        for i in $(seq 1 2) ; do
+        for i in $(seq 1 ${SNAPSHOTS_WAIT_PERIODS}) ; do
           aws --profile offsite --region ${SRC_RDS_DATABASE_REGION} rds wait db-snapshot-available --db-snapshot-identifier ${cartmp_snapshot_arn}
         done
 
